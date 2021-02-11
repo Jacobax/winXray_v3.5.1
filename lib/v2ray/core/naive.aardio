@@ -45,6 +45,7 @@ restart = function(editor,outbound,naiveSocksPort){
 	
 	var err;
 	prcsNaive,err = ..process.popen(corePath
+		,corePath //必须补上这个参数
 		,"--listen=socks://127.0.0.1:"+naiveSocksPort
 		,"--proxy="+ ..inet.url.stringify(urlInfo)
 		,extraHeaders

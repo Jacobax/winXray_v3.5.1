@@ -3,7 +3,7 @@ import fonts.fontAwesome;
 /*DSG{{*/
 var frmXray = win.form(text="winXray ";right=959;bottom=591;bgcolor=16777215)
 frmXray.add(
-btnEditPac={cls="plus";text="编辑PAC";left=332;top=367;right=438;bottom=397;align="left";db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=12}};iconText='\uF1C4';notify=1;textPadding={left=30};z=7};
+btnEditPacOrUwp={cls="plus";text="编辑PAC";left=328;top=367;right=447;bottom=397;align="left";db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=12}};iconText='\uF1C4';notify=1;textPadding={left=30};z=7};
 btnImportServerFromClipBd={cls="plus";text="批量导入链接";left=459;top=367;right=592;bottom=397;align="left";db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=12}};iconText='\uF196 ';notify=1;textPadding={left=30};z=8};
 btnTcping={cls="plus";text="检测并连接最快服务器";left=735;top=366;right=941;bottom=398;align="left";bgcolor=11580047;border={radius=4};db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=18}};iconText='\uF012';notify=1;textPadding={left=42};z=3};
 chkAutoTest={cls="plus";text="异常自动重连 ";left=598;top=367;right=729;bottom=397;align="left";db=1;dr=1;font=LOGFONT(h=-13);iconStyle={align="left";font=LOGFONT(h=-13;name='FontAwesome');padding={left=12}};iconText='\uF0C8';notify=1;textPadding={left=30};z=9};
@@ -30,7 +30,7 @@ frmXray.show();
 import config;
 import v2ray.core; 
 var currentOutboundIndex,currentOutboundAddress;
-var activeOutbound = function(outboundIndex,outboundAddress,enableRetry){
+var activeOutbound = function(outboundIndex,outboundAddress,enableRetry,timerTesting){
 	
 	if(!outboundIndex && !outboundAddress){
 		outboundIndex,outboundAddress = currentOutboundIndex,currentOutboundAddress;
@@ -44,14 +44,11 @@ var activeOutbound = function(outboundIndex,outboundAddress,enableRetry){
 		return ; 
 	} 
 	
-	var currentTesting = false;
-	if( ! v2ray.core.isInboundPortChanged() ){
-		currentTesting = currentOutboundIndex == outboundIndex && currentOutboundAddress == outboundAddress
-	}
- 
- 	..publish("activeOutbound",false); 
-	var startTesting = currentTesting;
+ 	
+	var startTesting = timerTesting;
 	if(!startTesting){
+		..publish("activeOutbound",false); 
+		
 		var started,err = v2ray.core.restart(frmXray.edit,outbound);
 		startTesting = started;
 		if(!started){
@@ -66,7 +63,7 @@ var activeOutbound = function(outboundIndex,outboundAddress,enableRetry){
 		frmXray.autoTesting = true;
 		
 		..thread.invoke( 
-			function(frmXray,outboundIndex,outboundAddress,sockProxyPort,httpProxyAddress,enableRetry,currentTesting){
+			function(frmXray,outboundIndex,outboundAddress,sockProxyPort,httpProxyAddress,enableRetry,timerTesting){
 				import web.rest.client;
 				var restClient = web.rest.client(,httpProxyAddress);
 				restClient._http.setTimeouts(1000,2000,2000);
@@ -74,22 +71,27 @@ var activeOutbound = function(outboundIndex,outboundAddress,enableRetry){
 				var lastStatusCode = restClient.lastStatusCode;
 				
 				if( lastStatusCode == 204 ){
-					frmXray.onStartXrayComplete(outboundIndex,currentTesting,outboundAddress); 
+					frmXray.onStartXrayComplete(outboundIndex,timerTesting,outboundAddress); 
 					return;	
 				}
 				restClient.close();
 				
-				if(currentTesting){
+				if(timerTesting){
 					sleep(100);
 				}
 				
 				import inet.http;
-				if(inet.http.isAlive(,httpProxyAddress)){
-					frmXray.onStartXrayComplete(outboundIndex,currentTesting,outboundAddress);
+				var http = inet.http(,httpProxyAddress);
+				http.setTimeouts(1000,1000,1000);
+				var isAlive = http.get("http://www.msftconnecttest.com/connecttest.txt")=="Microsoft Connect Test";
+				http.close();	 
+
+				if(isAlive){
+					frmXray.onStartXrayComplete(outboundIndex,timerTesting,outboundAddress);
 					return;	
 				}
 				
-				if(currentTesting){
+				if(timerTesting){
 					sleep(100);
 				}
 				
@@ -120,14 +122,14 @@ Accept-Charset:utf-8;
 						client.close();
 							
 						if( rep && ..string.startWith(rep,"HTTP/1.1 ") ){
-							frmXray.onStartXrayComplete(outboundIndex,currentTesting,outboundAddress);
+							frmXray.onStartXrayComplete(outboundIndex,timerTesting,outboundAddress);
 							return;	
 						} 
 					}
 				};
 				frmXray.onStartXrayFailed(outboundIndex,enableRetry,outboundAddress);
 			},frmXray,outboundIndex,outboundAddress, 
-			v2ray.core.socksProxyPort,v2ray.core.getSystemProxyConfig(),enableRetry,currentTesting
+			v2ray.core.socksProxyPort,v2ray.core.getSystemProxyConfig(),enableRetry,timerTesting
 		)
 
 		return true;
@@ -152,7 +154,7 @@ frmXray.autoUpdateSubscription = function(timeout){
 		}
 } 
 
-frmXray.onStartXrayComplete = function(outboundIndex,currentTesting,outboundAddress){
+frmXray.onStartXrayComplete = function(outboundIndex,timerTesting,outboundAddress){
 	frmXray.autoUpdateSubscription(-1);
 	
 	var outbound = config.proxy.outbounds[outboundIndex];
@@ -172,7 +174,7 @@ frmXray.onStartXrayComplete = function(outboundIndex,currentTesting,outboundAddr
 	listview.activeOutboundIndex = outboundIndex;
 
 	var address  = listview.getItemText(outboundIndex,2);
-	if(!currentTesting) frmXray.edit.print("已切换到服务器：",address);
+	if(!timerTesting) frmXray.edit.print("已切换到服务器：",address);
 	listview.activeOutboundAddress = address;
 
 	if(listview.getItemText(outboundIndex,7)=="不可用"){
@@ -273,6 +275,7 @@ var retryOnNetworkAliveTimerId;
 frmXray.onTcpingFailed = function(){
 	frmXray.autoTesting = false;
 	frmXray.btnTcping.disabledText = null;	
+	..publish("activeOutbound",false); 
 	
 	if(retryOnNetworkAliveTimerId){
 		frmXray.clearTimeout(retryOnNetworkAliveTimerId);
@@ -919,9 +922,11 @@ subscribe("sysProxy.modeChanged",function(mode){
 	
 	if(mode = "pac"){
 		frmXray.radioProxyPac.checked = true;
+		if(_WIN10_LATER) frmXray.btnEditPacOrUwp.text = "编辑 PAC";
 	}
 	elseif(mode = "proxy"){
 		frmXray.radioProxy.checked = true;
+		if(_WIN10_LATER) frmXray.btnEditPacOrUwp.text = "配置 UWP";
 	}
 	else{
 		frmXray.radioProxyDirect.checked = true;
@@ -946,8 +951,19 @@ frmXray.radioProxy.oncommand = switchProxyMode;
 frmXray.radioProxyDirect.oncommand = switchProxyMode;
 
 import win.dlg.message; 
-frmXray.btnEditPac.skin(style.plainButton)
-frmXray.btnEditPac.oncommand = function(id,event){
+frmXray.btnEditPacOrUwp.skin(style.plainButton)
+frmXray.btnEditPacOrUwp.oncommand = function(id,event){
+    if(frmXray.radioProxy.checked && _WIN10_LATER ){
+        if(_STUDIO_INVOKED){
+        	frmXray.msgErr("请先发布为 EXE！");
+        	return;
+        }
+        
+        import process;
+    	process.execute(io._exepath,"/uwp","runas")
+    	return;
+    }
+    
 	if(frmPac && win.isWindow(frmPac.hwnd)){
 		if( win.isIconic(frmPac.hwnd) ) win.show(frmPac.hwnd,9/*_SW_RESTORE*/ );
 		if( !win.isVisible(frmPac.hwnd) ) win.show(frmPac.hwnd,0x1/*_SW_NORMAL*/ );
@@ -959,7 +975,7 @@ frmXray.btnEditPac.oncommand = function(id,event){
 	frmPac.show();
 }
 subscribe("uiCommand.showPacForm",function(...){
-	frmXray.btnEditPac.oncommand();
+	frmXray.btnEditPacOrUwp.oncommand();
 } )
 
 subscribe("uiCommand.print",function(...){
@@ -1023,7 +1039,7 @@ frmXray.chkAutoTest.oncommand = function(id,event){
 			}
 			
 			frmXray.autoTesting = true; 
-			activeOutbound(idx,address,true);
+			activeOutbound(idx,address,true,true);
 			
 			return config.proxy.testInterval*1000;
 		} 
