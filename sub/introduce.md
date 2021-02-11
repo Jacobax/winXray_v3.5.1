@@ -5,7 +5,7 @@
 winXray 可通过【批量导入链接】功能导入以下格式的分享链接、订阅源、或JSON配置：
 
     1、一行或多行（忽略无效行）分享链接或服务器JSON配置。  
-    支持 vmess://，vless://，ss://，ssr://，trojan://， trojan-go://，native+http://，socks://  等通用分享链接。  
+    支持 vmess://，vless://，ss://，ssr://，trojan://， trojan-go://，native+http://，socks://, proxy://  等通用分享链接。  
 
     2、包含多个服务器配置的JSON数组,支持winXray格式以及通用格式JSON。  
 

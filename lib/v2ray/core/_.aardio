@@ -68,6 +68,7 @@ restart = function(editor,outbound){
 	
 	import sysProxy;
 	..sysProxy.reset(false);
+	
 
 	socksProxyPort = inbounds[1].port;  
 	httpProxPort = inbounds[2].port;

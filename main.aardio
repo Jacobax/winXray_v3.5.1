@@ -3,6 +3,10 @@ if(_ARGV.github){
 	loadcodex("\forms\main\tools\github.aardio");
 	return;
 }
+if(_ARGV.uwp){	
+	loadcodex("\forms\main\tools\uwpExemption.aardio");
+	return;
+}
 elseif(_ARGV.sshInstall){
 	import fsys.wow64;
 	import process;
@@ -157,7 +161,7 @@ import win.ui;
 /*DSG{{*/
 mainForm = win.form(text="winXray";right=1019;bottom=679;bgcolor=15793151;border="none")
 mainForm.add(
-caption={cls="bkplus";text="winXray 3.5.1";left=67;top=9;right=727;bottom=27;align="left";color=6052956;dl=1;dt=1;font=LOGFONT(h=-14);z=7};
+caption={cls="bkplus";text="winXray 3.7";left=67;top=9;right=727;bottom=27;align="left";color=6052956;dl=1;dt=1;font=LOGFONT(h=-14);z=7};
 custom={cls="custom";left=83;top=40;right=1022;bottom=679;bgcolor=16777215;db=1;dl=1;dr=1;dt=1;z=4};
 logo={cls="bkplus";text='\uF1D9';left=35;top=7;right=64;bottom=32;color=3054125;dl=1;dt=1;font=LOGFONT(h=-18;name='FontAwesome');z=6};
 navBar={cls="bkplus";left=0;top=37;right=83;bottom=681;bgcolor=3442175;db=1;dl=1;dt=1;z=1};
@@ -243,9 +247,21 @@ mainForm.wndproc = {
 			
 			mainForm.popmenu.add();
 			
-			var id = mainForm.popmenu.add('编辑 PAC 配置',function(id){  
+			mainForm.popmenu.add('编辑 PAC 配置',function(id){  
 				publish("uiCommand.showPacForm");	
 			});
+			
+			if(_WIN10_LATER){
+				mainForm.popmenu.add('UWP 应用代理配置',function(id){  
+				 	if(_STUDIO_INVOKED){
+        				mainForm.msgErr("请先发布为 EXE！");
+        				return;
+        			}
+        			
+        			import process;
+    				process.execute(io._exepath,"/uwp","runas")	
+				});	
+			}
 			
 			mainForm.popmenu.add();
 			
@@ -331,6 +347,17 @@ mainForm.tray = win.util.tray(mainForm)
 if(!_ARGV.tray){ 
 	mainForm.show(); 
 }
+
+import win.image;
+var trayIcons = {
+	direct = win.image.loadIconFromFile("\forms\ico\app-direct.ico");
+	pac = win.image.loadIconFromFile("\forms\ico\app-pac.ico");
+	proxy = _HAPPICON
+} 
+
+subscribe("sysProxy.modeChanged",function(active){
+	mainForm.tray.icon = trayIcons[config.proxy.mode] ;
+})
 
 subscribe("uiCommand.HotkeyChanged",function(...){
 	if(#config.proxy.hotkey){
